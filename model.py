@@ -524,23 +524,27 @@ def add_fit_score_predict_proba(class_to_chg):
     class_to_chg.predict_proba = MethodType(predict_proba, None, class_to_chg)
 
 
-DEEP = False
+DEEP = True
 ONEHOTENCODING = True
 
 def model(X_train, y_train, X_test):
     add_fit_score_predict_proba(DropoutNet)
+    add_fit_score_predict_proba(RegularizedNet)
+    DEEP = True
     if DEEP:
         numpy_rng = numpy.random.RandomState(42)
-        dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
-            #layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
-            #layers_sizes=[100, 100, 100],
-            #dropout_rates=[0.2, 0.5, 0.5, 0.5],
-            #layers_types=[ReLU, ReLU, LogisticRegression],
-            #layers_sizes=[100, 100],
-            #dropout_rates=[0.2, 0.5, 0.5],
+        #dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
+        #    layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
+        #    layers_sizes=[200, 200, 200],
+        #    dropout_rates=[0.2, 0.5, 0.5, 0.5],
+            #layers_types=[LogisticRegression],
+            #layers_sizes=[],
+            #dropout_rates=[0.0],
+        #    n_outs=2,
+        #    debugprint=0)
+        dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
             layers_types=[LogisticRegression],
             layers_sizes=[],
-            dropout_rates=[0.0],
             n_outs=2,
             debugprint=0)
         #clf = Pipeline([('imputer', Imputer()),
@@ -592,8 +596,9 @@ if __name__ == '__main__':
     print y_test.shape
     ys = [y_score[i, j] for i, j in enumerate(y_test)]
 
-    from sklearn.metrics import roc_auc_score
+    from sklearn.metrics import roc_auc_score, accuracy_score
     print "AUC:", roc_auc_score(y_test, ys)
+    print "acc:", accuracy_score(y_test, y_pred)
 
     #rf = RandomForestClassifier(n_estimators=200)
     #clf = Pipeline([('imputer', Imputer()), ('rf', rf)])
