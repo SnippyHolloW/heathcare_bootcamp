@@ -526,43 +526,48 @@ def add_fit_score_predict_proba(class_to_chg):
 
 def model(X_train, y_train, X_test):
     import numpy as np
-    #CLASSIFIER = 'NB'
-    CLASSIFIER = 'logistic'
+    CLASSIFIER = 'NB'
+    #CLASSIFIER = 'logistic'
     #CLASSIFIER = 'dnn'
-    ONEHOTENCODING = False
+    ONEHOTENCODING = True
     WEIGHTING = True
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
 
     imp = Imputer()
-    X_train = imp.fit_transform(X_train)
+    X_train_ = imp.fit_transform(X_train)
     X_test = imp.transform(X_test)
-    y_train = np.asarray(y_train, dtype='int32')
+    print X_train.shape
+    print X_test.shape
+    y_train_ = np.asarray(y_train, dtype='int32')
+    # ONE HOT ENCODING
+    if ONEHOTENCODING:
+        tmp = np.concatenate([X_train_, X_test], axis=0)
+        from sklearn.preprocessing import OneHotEncoder
+        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
+        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
+        tmp = ohe.fit_transform(tmp)
+        X_train_ = tmp[:X_train_.shape[0]]
+        print X_train_.shape
+        X_test = tmp[X_train_.shape[0]:]
+        print X_test.shape
     # WEIGHTING
     if WEIGHTING:
-        X_train_ = np.concatenate([X_train, X_train[y_train==1]], axis=0)
-        y_train_ = np.concatenate([y_train, y_train[y_train==1]], axis=0)
+        X_train_ = np.concatenate([X_train_, X_train_[y_train==1]], axis=0)
+        y_train_ = np.concatenate([y_train_, y_train_[y_train==1]], axis=0)
         from sklearn import utils
         print X_train_.shape
         print y_train_.shape
         X_train_, y_train_ = utils.shuffle(X_train_, y_train_)
     else:
         X_train_, y_train_ = X_train, y_train
-    # ONE HOT ENCODING
-    if ONEHOTENCODING:
-        from sklearn.preprocessing import OneHotEncoder
-        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
-        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
-        X_train_ = ohe.fit_transform(X_train_)
-        print X_train_.shape
-        X_test = ohe.transform(X_test)
-        print X_test.shape
     X_train_ = np.asarray(X_train_, dtype='float32')
+    X_test = np.asarray(X_test, dtype='float32')
 
     numpy_rng = numpy.random.RandomState(42)
 
     if CLASSIFIER == 'dnn':
-        #dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
+        #dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train_.shape[1],
         #    layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
         #    layers_sizes=[200, 200, 200],
         #    dropout_rates=[0.2, 0.5, 0.5, 0.5],
@@ -571,7 +576,7 @@ def model(X_train, y_train, X_test):
             #dropout_rates=[0.0],
         #    n_outs=2,
         #    debugprint=0)
-        dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
+        dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train_.shape[1],
             layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
             layers_sizes=[500, 500, 500],
             n_outs=2,
