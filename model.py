@@ -529,10 +529,10 @@ def model(X_train, y_train, X_test):
     import numpy as np
     #CLASSIFIER = 'NB'
     #CLASSIFIER = 'logistic'
-    #CLASSIFIER = 'mylogistic'
+    CLASSIFIER = 'mylogistic'
     #CLASSIFIER = 'dnn'
-    CLASSIFIER = 'rf+logistic'
-    ONEHOTENCODING = False
+    #CLASSIFIER = 'rf+logistic'
+    ONEHOTENCODING = True
     WEIGHTING = True
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
