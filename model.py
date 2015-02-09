@@ -529,10 +529,10 @@ def model(X_train, y_train, X_test):
     import numpy as np
     #CLASSIFIER = 'NB'
     #CLASSIFIER = 'logistic'
-    CLASSIFIER = 'mylogistic'
+    #CLASSIFIER = 'mylogistic'
     #CLASSIFIER = 'dnn'
-    #CLASSIFIER = 'rf+logistic'
-    ONEHOTENCODING = True
+    CLASSIFIER = 'rf+logistic'
+    ONEHOTENCODING = False
     WEIGHTING = True
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
@@ -544,8 +544,11 @@ def model(X_train, y_train, X_test):
     X_test = imp.transform(X_test)
     print X_train.shape
     print X_test.shape
-    y_train_ = np.asarray(y_train, dtype='int32')
-    C, D = joblib.load('CD.joblib')
+    y_train_ = np.asarray(y_train, dtype='int32') 
+    basedir = '/'.join(__file__.split('/')[:-1])
+    if basedir != '':
+        basedir += '/'
+    C, D = joblib.load(basedir + 'CD.joblib')
     # ONE HOT ENCODING
     if ONEHOTENCODING:
         tmp = np.concatenate([X_train_, X_test], axis=0)
@@ -619,7 +622,7 @@ def model(X_train, y_train, X_test):
         lr.fit(tmp, y_train_)
         rfpred2 = rf.predict_proba(X_test[:, D])
         tmp2 = np.concatenate([X_test[:, C], rfpred2], axis=1)
-        y_pred = lr.predict_proba(tmp2)
+        y_pred = lr.predict(tmp2)
         y_score = lr.predict_proba(tmp2)
 
     return y_pred, y_score
@@ -627,7 +630,10 @@ def model(X_train, y_train, X_test):
 if __name__ == '__main__':
     import pandas as pd
     import numpy as np
-    df = pd.read_csv('train.csv')
+    basedir = '/'.join(__file__.split('/')[:-1])
+    if basedir != '':
+        basedir += '/'
+    df = pd.read_csv(basedir + 'train.csv')
     y_train = np.array(df['TARGET'].values, dtype='int32')
     X_train = np.array(df.drop('TARGET', axis=1).values, dtype='float32')
     #X_train = df.drop('TARGET', axis=1).values
@@ -637,7 +643,7 @@ if __name__ == '__main__':
     cont_inds = filter(lambda (_, k): k not in cis, enumerate(df.drop('TARGET',axis=1).keys()))
     D = zip(*categ_inds)[0]
     C = zip(*cont_inds)[0]
-    joblib.dump((C, D), 'CD.joblib')
+    joblib.dump((C, D), basedir + 'CD.joblib')
 
     from sklearn.cross_validation import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train,
