@@ -530,7 +530,7 @@ def model(X_train, y_train, X_test):
     #CLASSIFIER = 'logistic'
     #CLASSIFIER = 'dnn'
     ONEHOTENCODING = True
-    WEIGHTING = True
+    WEIGHTING = False
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
 
@@ -559,8 +559,6 @@ def model(X_train, y_train, X_test):
         print X_train_.shape
         print y_train_.shape
         X_train_, y_train_ = utils.shuffle(X_train_, y_train_)
-    else:
-        X_train_, y_train_ = X_train, y_train
     X_train_ = np.asarray(X_train_, dtype='float32')
     X_test = np.asarray(X_test, dtype='float32')
 
