@@ -524,15 +524,44 @@ def add_fit_score_predict_proba(class_to_chg):
     class_to_chg.predict_proba = MethodType(predict_proba, None, class_to_chg)
 
 
-DEEP = True
-ONEHOTENCODING = True
-
 def model(X_train, y_train, X_test):
+    import numpy as np
+    #CLASSIFIER = 'NB'
+    CLASSIFIER = 'logistic'
+    #CLASSIFIER = 'dnn'
+    ONEHOTENCODING = False
+    WEIGHTING = True
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
-    DEEP = True
-    if DEEP:
-        numpy_rng = numpy.random.RandomState(42)
+
+    imp = Imputer()
+    X_train = imp.fit_transform(X_train)
+    X_test = imp.transform(X_test)
+    y_train = np.asarray(y_train, dtype='int32')
+    # WEIGHTING
+    if WEIGHTING:
+        X_train_ = np.concatenate([X_train, X_train[y_train==1]], axis=0)
+        y_train_ = np.concatenate([y_train, y_train[y_train==1]], axis=0)
+        from sklearn import utils
+        print X_train_.shape
+        print y_train_.shape
+        X_train_, y_train_ = utils.shuffle(X_train_, y_train_)
+    else:
+        X_train_, y_train_ = X_train, y_train
+    # ONE HOT ENCODING
+    if ONEHOTENCODING:
+        from sklearn.preprocessing import OneHotEncoder
+        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
+        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
+        X_train_ = ohe.fit_transform(X_train_)
+        print X_train_.shape
+        X_test = ohe.transform(X_test)
+        print X_test.shape
+    X_train_ = np.asarray(X_train_, dtype='float32')
+
+    numpy_rng = numpy.random.RandomState(42)
+
+    if CLASSIFIER == 'dnn':
         #dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
         #    layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
         #    layers_sizes=[200, 200, 200],
@@ -543,20 +572,26 @@ def model(X_train, y_train, X_test):
         #    n_outs=2,
         #    debugprint=0)
         dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
+            layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
+            layers_sizes=[500, 500, 500],
+            n_outs=2,
+            debugprint=0)
+        dnn.fit(X_train_, y_train_, max_epochs=50)
+        y_pred = dnn.predict(X_test)
+        y_score = dnn.predict_proba(X_test)
+    elif CLASSIFIER == 'logistic':
+        dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train_.shape[1],
             layers_types=[LogisticRegression],
             layers_sizes=[],
             n_outs=2,
             debugprint=0)
-        #clf = Pipeline([('imputer', Imputer()),
-        #    ('dnn', dnn)])
-        #clf.fit(X_train, y_train)
-        dnn.fit(X_train, y_train, max_epochs=50)
+        dnn.fit(X_train_, y_train_, max_epochs=50)
         y_pred = dnn.predict(X_test)
         y_score = dnn.predict_proba(X_test)
     else:
         from sklearn.naive_bayes import GaussianNB
         gnb = GaussianNB()
-        gnb.fit(X_train, y_train)
+        gnb.fit(X_train_, y_train_)
         y_pred = gnb.predict(X_test)
         y_score = gnb.predict_proba(X_test)
     return y_pred, y_score
@@ -569,27 +604,10 @@ if __name__ == '__main__':
     X_train = np.array(df.drop('TARGET', axis=1).values, dtype='float32')
     #X_train = df.drop('TARGET', axis=1).values
     #X_train = np.nan_to_num(X_train)
-    X_train = Imputer().fit_transform(X_train)
-
-    # WEIGHTING
-    X_train = np.concatenate([X_train, X_train[y_train==1]], axis=0)
-    y_train = np.concatenate([y_train, y_train[y_train==1]], axis=0)
-    from sklearn import utils
-    print X_train.shape
-    print y_train.shape
-    X_train, y_train = utils.shuffle(X_train, y_train)
-
-    # ONE HOT ENCODING
-    if ONEHOTENCODING:
-        from sklearn.preprocessing import OneHotEncoder
-        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
-        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
-        X_train = np.asarray(ohe.fit_transform(X_train), dtype='float32')
-        print X_train.shape
 
     from sklearn.cross_validation import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train,
-            test_size=0.2)
+            test_size=0.15)
     y_pred, y_score = model(X_train, y_train, X_test)
     print y_pred.shape
     print y_score.shape
