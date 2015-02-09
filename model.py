@@ -1,7 +1,8 @@
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression as SKLR
 from sklearn.preprocessing import Imputer
 from sklearn.pipeline import Pipeline
-import theano, sys
+import theano, sys, joblib
 from theano import tensor as T
 from theano import shared
 from theano.tensor.shared_randomstreams import RandomStreams
@@ -526,13 +527,17 @@ def add_fit_score_predict_proba(class_to_chg):
 
 def model(X_train, y_train, X_test):
     import numpy as np
-    CLASSIFIER = 'NB'
+    #CLASSIFIER = 'NB'
     #CLASSIFIER = 'logistic'
+    CLASSIFIER = 'mylogistic'
     #CLASSIFIER = 'dnn'
+    #CLASSIFIER = 'rf+logistic'
     ONEHOTENCODING = True
-    WEIGHTING = False
+    WEIGHTING = True
     add_fit_score_predict_proba(DropoutNet)
     add_fit_score_predict_proba(RegularizedNet)
+    if CLASSIFIER == 'rf+logistic':
+        ONEHOTENCODING = False
 
     imp = Imputer()
     X_train_ = imp.fit_transform(X_train)
@@ -540,12 +545,12 @@ def model(X_train, y_train, X_test):
     print X_train.shape
     print X_test.shape
     y_train_ = np.asarray(y_train, dtype='int32')
+    C, D = joblib.load('CD.joblib')
     # ONE HOT ENCODING
     if ONEHOTENCODING:
         tmp = np.concatenate([X_train_, X_test], axis=0)
         from sklearn.preprocessing import OneHotEncoder
-        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
-        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
+        ohe = OneHotEncoder(categorical_features=D, sparse=False)
         tmp = ohe.fit_transform(tmp)
         X_train_ = tmp[:X_train_.shape[0]]
         print X_train_.shape
@@ -582,7 +587,7 @@ def model(X_train, y_train, X_test):
         dnn.fit(X_train_, y_train_, max_epochs=50)
         y_pred = dnn.predict(X_test)
         y_score = dnn.predict_proba(X_test)
-    elif CLASSIFIER == 'logistic':
+    elif CLASSIFIER == 'mylogistic':
         dnn = RegularizedNet(numpy_rng=numpy_rng, n_ins=X_train_.shape[1],
             layers_types=[LogisticRegression],
             layers_sizes=[],
@@ -591,12 +596,32 @@ def model(X_train, y_train, X_test):
         dnn.fit(X_train_, y_train_, max_epochs=50)
         y_pred = dnn.predict(X_test)
         y_score = dnn.predict_proba(X_test)
-    else:
+    elif CLASSIFIER == 'logistic':
+        lr = SKLR()
+        lr.fit(X_train_, y_train_)
+        y_pred = lr.predict(X_test)
+        y_score = lr.predict_proba(X_test)
+    elif CLASSIFIER == 'NB':
         from sklearn.naive_bayes import GaussianNB
         gnb = GaussianNB()
         gnb.fit(X_train_, y_train_)
         y_pred = gnb.predict(X_test)
         y_score = gnb.predict_proba(X_test)
+    elif CLASSIFIER == 'rf+logistic':
+        if ONEHOTENCODING:
+            print "rf+logistic is incompatible with OneHotEncoder"
+            sys.exit(-1)
+        rf = RandomForestClassifier(n_estimators=420)
+        rf.fit(X_train_[:, D], y_train_)
+        rfpred = rf.predict_proba(X_train_[:, D])
+        lr = SKLR()
+        tmp = np.concatenate([X_train_[:, C], rfpred], axis=1)
+        lr.fit(tmp, y_train_)
+        rfpred2 = rf.predict_proba(X_test[:, D])
+        tmp2 = np.concatenate([X_test[:, C], rfpred2], axis=1)
+        y_pred = lr.predict_proba(tmp2)
+        y_score = lr.predict_proba(tmp2)
+
     return y_pred, y_score
 
 if __name__ == '__main__':
@@ -607,6 +632,12 @@ if __name__ == '__main__':
     X_train = np.array(df.drop('TARGET', axis=1).values, dtype='float32')
     #X_train = df.drop('TARGET', axis=1).values
     #X_train = np.nan_to_num(X_train)
+    categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.drop('TARGET',axis=1).keys()))
+    cis = set(categ_inds)
+    cont_inds = filter(lambda (_, k): k not in cis, enumerate(df.drop('TARGET',axis=1).keys()))
+    D = zip(*categ_inds)[0]
+    C = zip(*cont_inds)[0]
+    joblib.dump((C, D), 'CD.joblib')
 
     from sklearn.cross_validation import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train,
@@ -621,9 +652,6 @@ if __name__ == '__main__':
     print "AUC:", roc_auc_score(y_test, ys)
     print "acc:", accuracy_score(y_test, y_pred)
 
-    #rf = RandomForestClassifier(n_estimators=200)
-    #clf = Pipeline([('imputer', Imputer()), ('rf', rf)])
-    #X_train = clf.fit_transform(X_train, y_train)
 
 
 
