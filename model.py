@@ -524,24 +524,37 @@ def add_fit_score_predict_proba(class_to_chg):
     class_to_chg.predict_proba = MethodType(predict_proba, None, class_to_chg)
 
 
+DEEP = False
+ONEHOTENCODING = True
+
 def model(X_train, y_train, X_test):
     add_fit_score_predict_proba(DropoutNet)
-    numpy_rng = numpy.random.RandomState(42)
-    dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
-        #layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
-        #layers_sizes=[100, 100, 100],
-        #dropout_rates=[0.2, 0.5, 0.5, 0.5],
-        layers_types=[LogisticRegression],
-        layers_sizes=[],
-        dropout_rates=[0.0],
-        n_outs=2,
-        debugprint=0)
-    #clf = Pipeline([('imputer', Imputer()),
-    #    ('dnn', dnn)])
-    #clf.fit(X_train, y_train)
-    dnn.fit(X_train, y_train, max_epochs=50)
-    y_pred = dnn.predict(X_test)
-    y_score = dnn.predict_proba(X_test)
+    if DEEP:
+        numpy_rng = numpy.random.RandomState(42)
+        dnn = DropoutNet(numpy_rng=numpy_rng, n_ins=X_train.shape[1],
+            #layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
+            #layers_sizes=[100, 100, 100],
+            #dropout_rates=[0.2, 0.5, 0.5, 0.5],
+            #layers_types=[ReLU, ReLU, LogisticRegression],
+            #layers_sizes=[100, 100],
+            #dropout_rates=[0.2, 0.5, 0.5],
+            layers_types=[LogisticRegression],
+            layers_sizes=[],
+            dropout_rates=[0.0],
+            n_outs=2,
+            debugprint=0)
+        #clf = Pipeline([('imputer', Imputer()),
+        #    ('dnn', dnn)])
+        #clf.fit(X_train, y_train)
+        dnn.fit(X_train, y_train, max_epochs=50)
+        y_pred = dnn.predict(X_test)
+        y_score = dnn.predict_proba(X_test)
+    else:
+        from sklearn.naive_bayes import GaussianNB
+        gnb = GaussianNB()
+        gnb.fit(X_train, y_train)
+        y_pred = gnb.predict(X_test)
+        y_score = gnb.predict_proba(X_test)
     return y_pred, y_score
 
 if __name__ == '__main__':
@@ -551,7 +564,8 @@ if __name__ == '__main__':
     y_train = np.array(df['TARGET'].values, dtype='int32')
     X_train = np.array(df.drop('TARGET', axis=1).values, dtype='float32')
     #X_train = df.drop('TARGET', axis=1).values
-    X_train = np.nan_to_num(X_train)
+    #X_train = np.nan_to_num(X_train)
+    X_train = Imputer().fit_transform(X_train)
 
     # WEIGHTING
     X_train = np.concatenate([X_train, X_train[y_train==1]], axis=0)
@@ -562,11 +576,12 @@ if __name__ == '__main__':
     X_train, y_train = utils.shuffle(X_train, y_train)
 
     # ONE HOT ENCODING
-    #from sklearn.preprocessing import OneHotEncoder
-    #categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
-    #ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0])
-    #X_train = ohe.fit_transform(X_train)
-    #print X_train.shape
+    if ONEHOTENCODING:
+        from sklearn.preprocessing import OneHotEncoder
+        categ_inds = filter(lambda (_, k): k.isupper(), enumerate(df.keys()))
+        ohe = OneHotEncoder(categorical_features=zip(*categ_inds)[0], sparse=False)
+        X_train = np.asarray(ohe.fit_transform(X_train), dtype='float32')
+        print X_train.shape
 
     from sklearn.cross_validation import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train,
